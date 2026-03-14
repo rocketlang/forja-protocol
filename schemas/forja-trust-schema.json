@@ -1,0 +1,327 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ankrlabs.org/forja/schemas/trust/v0.1",
+  "title": "FORJA/TRUST",
+  "description": "AnkrForja Protocol — Trust Contract. Declares what AI agents are permitted to do, at what tier, and under what kill switch conditions. (FRJ-004, FRJ-005, FRJ-010, FRJ-011, FRJ-015)",
+  "version": "0.1",
+  "type": "object",
+  "required": [
+    "forja_version",
+    "service_id",
+    "default_tier",
+    "action_tiers",
+    "kill_switch"
+  ],
+  "additionalProperties": false,
+
+  "definitions": {
+    "trust_tier": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3],
+      "description": "Trust tier. 0=off (no AI access), 1=read-only, 2=low-risk write, 3=full autonomy."
+    }
+  },
+
+  "properties": {
+
+    "forja_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Protocol version. (FRJ-014)",
+      "example": "0.1"
+    },
+
+    "service_id": {
+      "type": "string",
+      "description": "Forja service ID — must match identity.id in the service's STATE manifest.",
+      "example": "org.ankrlabs.mari8x"
+    },
+
+    "default_tier": {
+      "$ref": "#/definitions/trust_tier",
+      "description": "Tier applied to any action type NOT explicitly declared in action_tiers. Default is 0 (off). (FRJ-005) — silence is not permission.",
+      "default": 0
+    },
+
+    "action_tiers": {
+      "type": "array",
+      "description": "Per-action-type trust tier declarations. Trust is declared per action, not per service globally. (FRJ-004)",
+      "items": {
+        "type": "object",
+        "required": ["action_id", "action_type", "tier"],
+        "additionalProperties": false,
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "description": "Matches a capability ID from the service's STATE manifest ai_surface.",
+            "example": "laytime-calculate"
+          },
+          "action_type": {
+            "type": "string",
+            "enum": ["query", "write", "delete", "deploy", "publish", "notify", "batch", "admin"],
+            "description": "Category of action this tier declaration applies to."
+          },
+          "tier": {
+            "$ref": "#/definitions/trust_tier",
+            "description": "Trust tier for this specific action type."
+          },
+          "conditions": {
+            "type": "array",
+            "description": "Optional additional conditions that must be met before this tier is applied.",
+            "items": {
+              "type": "object",
+              "required": ["condition", "description"],
+              "additionalProperties": false,
+              "properties": {
+                "condition": {
+                  "type": "string",
+                  "enum": ["sense_health_above", "error_rate_below", "time_window", "human_approval", "confidence_above"],
+                  "description": "Type of condition."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Human-readable explanation of this condition."
+                },
+                "threshold": {
+                  "type": "number",
+                  "description": "Numeric threshold (for health, error_rate, confidence conditions)."
+                },
+                "window": {
+                  "type": "string",
+                  "description": "Time window specification (e.g. '09:00-17:00 IST Mon-Fri')."
+                }
+              }
+            }
+          },
+          "requires_rollback_descriptor": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether a rollback descriptor is required before this action executes. (FRJ-008) Always true for Tier 2+."
+          },
+          "inherently_irreversible": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, this action cannot be rolled back by nature (e.g. sent email, published blockchain tx). Must be declared here pre-execution, not discovered post-execution. (FRJ-008)"
+          },
+          "log_before_execute": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether action must be logged before execution. Always true for Tier 2+. (FRJ-007)"
+          }
+        }
+      }
+    },
+
+    "kill_switch": {
+      "type": "object",
+      "description": "Automatic kill switch configuration. Required for any service operating at Tier 2 or above. (FRJ-010, FRJ-022)",
+      "required": ["enabled", "error_rate_threshold", "fallback_tier"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the kill switch is active. Must be true for Tier 2+ services.",
+          "default": true
+        },
+        "error_rate_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "SENSE error_rate value that triggers automatic tier suspension. (FRJ-022) Default: 0.02 (2%).",
+          "default": 0.02,
+          "example": 0.02
+        },
+        "fallback_tier": {
+          "$ref": "#/definitions/trust_tier",
+          "description": "Tier to drop to when kill switch fires. Typically 1 (read-only) or 0 (off).",
+          "default": 1
+        },
+        "notification_endpoint": {
+          "type": "string",
+          "description": "Webhook endpoint to notify when kill switch fires.",
+          "example": "https://ankrlabs.org/alerts/forja-kill-switch"
+        },
+        "sense_snapshot_on_trigger": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to capture a full SENSE snapshot when the kill switch fires. Recommended for root cause analysis. (FRJ-YK-009)"
+        },
+        "auto_recovery": {
+          "type": "object",
+          "description": "Configuration for automatic tier recovery after kill switch fires.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Whether automatic tier recovery is permitted. Default false — human decision required. (FRJ-009)"
+            },
+            "recovery_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "SENSE error_rate must fall below this for auto-recovery to be considered.",
+              "example": 0.005
+            },
+            "minimum_stable_duration_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "description": "Minimum time (seconds) error_rate must stay below recovery_threshold before auto-recovery.",
+              "example": 300
+            }
+          }
+        }
+      }
+    },
+
+    "self_escalation_prevention": {
+      "type": "object",
+      "description": "Configuration for preventing AI agents from escalating their own trust tier. (FRJ-011)",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Must be true. AI agents cannot escalate their own tier. This is a non-negotiable protocol constraint."
+        },
+        "rejection_code": {
+          "type": "string",
+          "default": "FRJ-011",
+          "description": "Error code returned when self-escalation is attempted."
+        }
+      }
+    },
+
+    "tier_history_endpoint": {
+      "type": "string",
+      "description": "Endpoint where tier change history can be audited. Tier changes must be logged with human authorization token. (FRJ-015)",
+      "example": "/forja/trust/history"
+    },
+
+    "authorized_agents": {
+      "type": "array",
+      "description": "Optional: specific agent identifiers authorized to act on this service. If empty, any agent that satisfies trust tier conditions may act.",
+      "items": {
+        "type": "object",
+        "required": ["agent_id", "max_tier"],
+        "additionalProperties": false,
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Unique identifier for the authorized agent.",
+            "example": "ankr-claw-v2"
+          },
+          "max_tier": {
+            "$ref": "#/definitions/trust_tier",
+            "description": "Maximum tier this agent may operate at on this service."
+          },
+          "authorized_actions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Specific action IDs this agent is authorized for. If empty, all declared actionable surfaces apply."
+          }
+        }
+      }
+    },
+
+    "trust_meta": {
+      "type": "object",
+      "description": "Metadata about this trust contract.",
+      "additionalProperties": false,
+      "properties": {
+        "effective_from": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this trust contract became effective."
+        },
+        "authorized_by": {
+          "type": "string",
+          "description": "Human identifier who authorized this trust contract.",
+          "example": "Capt AKS — ANKR Labs"
+        },
+        "last_reviewed": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this contract was last reviewed by a human."
+        },
+        "review_frequency_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How often this trust contract should be reviewed.",
+          "example": 30
+        }
+      }
+    }
+
+  },
+
+  "examples": [
+    {
+      "forja_version": "0.1",
+      "service_id": "org.ankrlabs.mari8x",
+      "default_tier": 0,
+      "action_tiers": [
+        {
+          "action_id": "voyage-list",
+          "action_type": "query",
+          "tier": 1,
+          "requires_rollback_descriptor": false,
+          "inherently_irreversible": false,
+          "log_before_execute": false
+        },
+        {
+          "action_id": "laytime-calculate",
+          "action_type": "query",
+          "tier": 1,
+          "requires_rollback_descriptor": false,
+          "inherently_irreversible": false,
+          "log_before_execute": false
+        },
+        {
+          "action_id": "laytime-submit",
+          "action_type": "write",
+          "tier": 2,
+          "requires_rollback_descriptor": true,
+          "inherently_irreversible": false,
+          "log_before_execute": true,
+          "conditions": [
+            {
+              "condition": "sense_health_above",
+              "description": "Service health must be above 0.80 before write actions are permitted.",
+              "threshold": 0.80
+            }
+          ]
+        },
+        {
+          "action_id": "nor-tender",
+          "action_type": "publish",
+          "tier": 2,
+          "requires_rollback_descriptor": true,
+          "inherently_irreversible": true,
+          "log_before_execute": true
+        }
+      ],
+      "kill_switch": {
+        "enabled": true,
+        "error_rate_threshold": 0.02,
+        "fallback_tier": 1,
+        "notification_endpoint": "https://ankrlabs.org/alerts/mari8x",
+        "sense_snapshot_on_trigger": true,
+        "auto_recovery": {
+          "enabled": false
+        }
+      },
+      "self_escalation_prevention": {
+        "enabled": true,
+        "rejection_code": "FRJ-011"
+      },
+      "tier_history_endpoint": "/forja/trust/history",
+      "trust_meta": {
+        "effective_from": "2026-03-14T00:00:00Z",
+        "authorized_by": "Capt AKS — ANKR Labs",
+        "last_reviewed": "2026-03-14T00:00:00Z",
+        "review_frequency_days": 30
+      }
+    }
+  ]
+}

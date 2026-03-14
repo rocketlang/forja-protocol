@@ -1,0 +1,380 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ankrlabs.org/forja/schemas/state/v0.1",
+  "title": "FORJA/STATE",
+  "description": "AnkrForja Protocol — Service State Manifest. Every Forja-compliant service MUST publish a conforming STATE manifest. (FRJ-001, FRJ-002, FRJ-003)",
+  "version": "0.1",
+  "type": "object",
+  "required": [
+    "forja_version",
+    "identity",
+    "capabilities",
+    "knowledge",
+    "dependencies",
+    "ai_surface"
+  ],
+  "additionalProperties": false,
+  "properties": {
+
+    "forja_version": {
+      "type": "string",
+      "description": "Protocol version this manifest conforms to. (FRJ-014)",
+      "pattern": "^\\d+\\.\\d+$",
+      "example": "0.1"
+    },
+
+    "identity": {
+      "type": "object",
+      "description": "Immutable service identity block.",
+      "required": ["id", "name", "version", "domain", "owner"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Globally unique service identifier. Reverse-domain notation recommended.",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "example": "org.ankrlabs.mari8x"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable service name.",
+          "example": "Mari8X — Maritime Operations Platform"
+        },
+        "version": {
+          "type": "string",
+          "description": "Service version (semver).",
+          "pattern": "^\\d+\\.\\d+\\.\\d+",
+          "example": "2.4.1"
+        },
+        "domain": {
+          "type": "string",
+          "description": "Primary knowledge domain.",
+          "example": "maritime"
+        },
+        "subdomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Secondary knowledge domains this service covers.",
+          "example": ["laytime", "charter-party", "freight"]
+        },
+        "owner": {
+          "type": "string",
+          "description": "Organisation or team responsible for this service.",
+          "example": "ANKR Labs, Gurgaon"
+        },
+        "description": {
+          "type": "string",
+          "description": "One-line description of what this service does.",
+          "example": "Maritime voyage management, laytime calculation, and chartering operations."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Free-form classification tags."
+        }
+      }
+    },
+
+    "capabilities": {
+      "type": "array",
+      "description": "What this service can do. At least one capability is required. (FRJ-003)",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Capability identifier, unique within this service.",
+            "example": "laytime-calculate"
+          },
+          "name": {
+            "type": "string",
+            "example": "Laytime Calculation"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["query", "mutation", "subscription", "webhook", "batch", "stream"],
+            "description": "Capability interaction type."
+          },
+          "description": {
+            "type": "string",
+            "example": "Calculates laytime and demurrage/despatch for a voyage under specified charter party terms."
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "Relative path to this capability's entry point.",
+            "example": "/graphql"
+          },
+          "input_schema": {
+            "type": "string",
+            "description": "URI or inline reference to input schema.",
+            "example": "https://ankrlabs.org/schemas/mari8x/laytime-input.json"
+          },
+          "output_schema": {
+            "type": "string",
+            "description": "URI or inline reference to output schema."
+          },
+          "knowledge_rules_applied": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Rule IDs that govern this capability's domain logic. (FRJ-012)",
+            "example": ["LAY-001", "LAY-007", "LAY-012"]
+          }
+        }
+      }
+    },
+
+    "knowledge": {
+      "type": "object",
+      "description": "Domain knowledge this service exposes. Rules must be certified in SuperDomain. (FRJ-012, FRJ-018)",
+      "required": ["rule_count", "certified_count", "last_updated"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of rules (candidate + certified) this service declares knowledge over."
+        },
+        "certified_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of rules with status=certified in SuperDomain."
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of rules with status=candidate (not yet certified)."
+        },
+        "last_updated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last knowledge review. (FRJ-018)"
+        },
+        "superdomain_endpoint": {
+          "type": "string",
+          "description": "URL of the SuperDomain instance where rules are registered.",
+          "example": "http://localhost:4160"
+        },
+        "rule_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "All rule IDs this service has registered knowledge over.",
+          "example": ["LAY-001", "LAY-002", "LAY-YK-001", "INF-LAY-001"]
+        },
+        "certified_rule_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Subset of rule_ids that are certified (status=certified).",
+          "example": ["LAY-001", "LAY-002"]
+        },
+        "domains_covered": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Domain names this service has registered rules in.",
+          "example": ["laytime", "charter-party"]
+        }
+      }
+    },
+
+    "dependencies": {
+      "type": "array",
+      "description": "Services this service depends on. Required — omission creates false operational picture. (FRJ-003)",
+      "items": {
+        "type": "object",
+        "required": ["id", "health_impact"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Forja service ID of the dependency.",
+            "example": "org.ankrlabs.superdomain"
+          },
+          "name": {
+            "type": "string",
+            "example": "SuperDomain"
+          },
+          "health_impact": {
+            "type": "string",
+            "enum": ["critical", "degraded", "cosmetic"],
+            "description": "Impact on this service if the dependency is unavailable. critical=service fails, degraded=service works with reduced capability, cosmetic=non-functional impact only."
+          },
+          "forja_compliant": {
+            "type": "boolean",
+            "description": "Whether the dependency is itself Forja-compliant.",
+            "default": false
+          },
+          "state_endpoint": {
+            "type": "string",
+            "description": "Forja/STATE endpoint of this dependency, if Forja-compliant.",
+            "example": "http://localhost:4160/forja/state"
+          }
+        }
+      }
+    },
+
+    "ai_surface": {
+      "type": "object",
+      "description": "Declares exactly which surfaces AI agents may interact with. Three categories required. (FRJ-023)",
+      "required": ["queryable", "actionable", "restricted"],
+      "additionalProperties": false,
+      "properties": {
+        "queryable": {
+          "type": "array",
+          "description": "Surfaces AI agents may read. No state change. Trust Tier 1 minimum.",
+          "items": {
+            "type": "object",
+            "required": ["id", "description"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "example": "voyage-list" },
+              "description": { "type": "string", "example": "List all voyages with status and ETA." },
+              "endpoint": { "type": "string", "example": "/graphql#voyageList" },
+              "knowledge_rules": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Rule IDs that govern the knowledge returned by this surface."
+              }
+            }
+          }
+        },
+        "actionable": {
+          "type": "array",
+          "description": "Surfaces AI agents may act on. State-changing. Requires declared TRUST tier ≥ 2.",
+          "items": {
+            "type": "object",
+            "required": ["id", "description", "trust_tier_required"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "example": "laytime-submit" },
+              "description": { "type": "string", "example": "Submit laytime statement for a voyage." },
+              "endpoint": { "type": "string" },
+              "trust_tier_required": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 3,
+                "description": "Minimum TRUST tier required for this action."
+              },
+              "inherently_irreversible": {
+                "type": "boolean",
+                "default": false,
+                "description": "If true, rollback is not possible by nature. Must be declared pre-execution. (FRJ-008)"
+              }
+            }
+          }
+        },
+        "restricted": {
+          "type": "array",
+          "description": "Surfaces no AI agent may access regardless of trust tier. (FRJ-023)",
+          "items": {
+            "type": "object",
+            "required": ["id", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "example": "admin-user-delete" },
+              "reason": { "type": "string", "example": "Destructive operation. Human-only. No AI access surface." }
+            }
+          }
+        }
+      }
+    },
+
+    "manifest_meta": {
+      "type": "object",
+      "description": "Metadata about this manifest itself.",
+      "additionalProperties": false,
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this manifest was generated."
+        },
+        "generated_by": {
+          "type": "string",
+          "description": "System or tool that generated this manifest.",
+          "example": "ankr-codex-daemon v1.2"
+        },
+        "conformance_level": {
+          "type": "string",
+          "enum": ["state-only", "state-trust", "full"],
+          "description": "Which Forja layers this service currently implements. (FRJ-024)"
+        }
+      }
+    }
+
+  },
+
+  "examples": [
+    {
+      "forja_version": "0.1",
+      "identity": {
+        "id": "org.ankrlabs.mari8x",
+        "name": "Mari8X — Maritime Operations Platform",
+        "version": "2.4.1",
+        "domain": "maritime",
+        "subdomains": ["laytime", "charter-party", "freight"],
+        "owner": "ANKR Labs, Gurgaon",
+        "description": "Maritime voyage management, laytime calculation, and chartering."
+      },
+      "capabilities": [
+        {
+          "id": "laytime-calculate",
+          "name": "Laytime Calculation",
+          "type": "query",
+          "description": "Calculate laytime and demurrage/despatch for a voyage.",
+          "endpoint": "/graphql",
+          "knowledge_rules_applied": ["LAY-001", "LAY-007", "LAY-012"]
+        }
+      ],
+      "knowledge": {
+        "rule_count": 47,
+        "certified_count": 15,
+        "candidate_count": 32,
+        "last_updated": "2026-03-14T00:00:00Z",
+        "superdomain_endpoint": "http://localhost:4160",
+        "rule_ids": ["LAY-001", "LAY-002", "LAY-YK-001", "INF-LAY-001"],
+        "certified_rule_ids": ["LAY-001", "LAY-002"],
+        "domains_covered": ["laytime", "charter-party"]
+      },
+      "dependencies": [
+        {
+          "id": "org.ankrlabs.superdomain",
+          "name": "SuperDomain",
+          "health_impact": "critical",
+          "forja_compliant": false
+        }
+      ],
+      "ai_surface": {
+        "queryable": [
+          {
+            "id": "voyage-list",
+            "description": "List all voyages with status and ETA.",
+            "endpoint": "/graphql#voyageList",
+            "knowledge_rules": ["LAY-001"]
+          }
+        ],
+        "actionable": [
+          {
+            "id": "laytime-submit",
+            "description": "Submit laytime statement for a voyage.",
+            "endpoint": "/graphql#submitLaytime",
+            "trust_tier_required": 2,
+            "inherently_irreversible": false
+          }
+        ],
+        "restricted": [
+          {
+            "id": "admin-user-delete",
+            "reason": "Destructive operation. Human-only. No AI access."
+          }
+        ]
+      },
+      "manifest_meta": {
+        "generated_at": "2026-03-14T08:00:00Z",
+        "generated_by": "ankr-codex-daemon v1.2",
+        "conformance_level": "full"
+      }
+    }
+  ]
+}

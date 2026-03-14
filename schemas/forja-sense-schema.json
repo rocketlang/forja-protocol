@@ -1,0 +1,361 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ankrlabs.org/forja/schemas/sense/v0.1",
+  "title": "FORJA/SENSE",
+  "description": "AnkrForja Protocol — Operational Intelligence Schema. Emitted by every Forja-compliant service. Unauthenticated — any agent may query. (FRJ-006, FRJ-013, FRJ-019, FRJ-022)",
+  "version": "0.1",
+  "type": "object",
+  "required": [
+    "forja_version",
+    "service_id",
+    "timestamp",
+    "health",
+    "velocity",
+    "security",
+    "knowledge_drift"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+
+    "forja_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Protocol version. (FRJ-014)",
+      "example": "0.1"
+    },
+
+    "service_id": {
+      "type": "string",
+      "description": "Forja service ID — matches identity.id in STATE manifest.",
+      "example": "org.ankrlabs.mari8x"
+    },
+
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when this SENSE snapshot was captured."
+    },
+
+    "health": {
+      "type": "object",
+      "description": "Service health indicators.",
+      "required": ["score", "status", "error_rate"],
+      "additionalProperties": false,
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Composite health score 0.0–1.0. 1.0 = fully healthy. Below 0.60 triggers proactive trust reduction. (INF-FRJ-005)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["healthy", "degraded", "critical", "unknown"],
+          "description": "Human-readable status bucket derived from score."
+        },
+        "error_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Current request error rate 0.0–1.0. This is the CANONICAL kill switch signal. (FRJ-022) At declared kill switch threshold, AI autonomy is automatically suspended."
+        },
+        "uptime_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Seconds since last restart."
+        },
+        "latency_p50_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Median response latency in milliseconds."
+        },
+        "latency_p99_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "99th percentile response latency in milliseconds."
+        },
+        "last_error": {
+          "type": "object",
+          "description": "Most recent error recorded.",
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": { "type": "string", "format": "date-time" },
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          }
+        },
+        "dependency_health": {
+          "type": "array",
+          "description": "Health status of declared dependencies.",
+          "items": {
+            "type": "object",
+            "required": ["dependency_id", "reachable"],
+            "additionalProperties": false,
+            "properties": {
+              "dependency_id": { "type": "string" },
+              "reachable": { "type": "boolean" },
+              "last_checked": { "type": "string", "format": "date-time" },
+              "health_impact": {
+                "type": "string",
+                "enum": ["critical", "degraded", "cosmetic"]
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "velocity": {
+      "type": "object",
+      "description": "Service throughput and activity metrics.",
+      "required": ["requests_per_minute"],
+      "additionalProperties": false,
+      "properties": {
+        "requests_per_minute": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Current request rate."
+        },
+        "requests_last_hour": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requests_last_24h": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ai_agent_requests_last_hour": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Requests from AI agents in the last hour. Distinguishes agent traffic from human traffic."
+        },
+        "active_sessions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "queue_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of requests queued (if applicable)."
+        }
+      }
+    },
+
+    "security": {
+      "type": "object",
+      "description": "Security posture indicators.",
+      "required": ["current_trust_tier"],
+      "additionalProperties": false,
+      "properties": {
+        "current_trust_tier": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3],
+          "description": "Active trust tier at time of this SENSE snapshot. May differ from TRUST contract if kill switch has fired."
+        },
+        "kill_switch_active": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the kill switch has fired and AI autonomy is suspended."
+        },
+        "kill_switch_fired_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when kill switch last fired, if applicable."
+        },
+        "last_tier_change": {
+          "type": "object",
+          "description": "Most recent trust tier change event.",
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": { "type": "string", "format": "date-time" },
+            "from_tier": { "type": "integer", "enum": [0, 1, 2, 3] },
+            "to_tier": { "type": "integer", "enum": [0, 1, 2, 3] },
+            "authorized_by": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        },
+        "self_escalation_attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of self-escalation attempts blocked in the last 24h. Non-zero is a security signal. (FRJ-011)"
+        },
+        "failed_auth_attempts_last_hour": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_security_scan": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this service was last scanned by XShield or equivalent."
+        },
+        "security_findings_open": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of open security findings."
+        }
+      }
+    },
+
+    "knowledge_drift": {
+      "type": "object",
+      "description": "Indicators of domain knowledge staleness and conflict. First-class SENSE signal — not optional monitoring. (FRJ-019)",
+      "required": ["stale_rules", "last_rule_update", "conflict_count"],
+      "additionalProperties": false,
+      "properties": {
+        "stale_rules": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of certified rules not reviewed since the last domain change. Rising number = drift signal."
+        },
+        "last_rule_update": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of most recent rule review in SuperDomain."
+        },
+        "conflict_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of open rule conflicts detected by the conflict detector. Non-zero requires human resolution. (FRJ-017)"
+        },
+        "days_since_last_certification": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Days elapsed since any rule was certified. High values indicate knowledge review backlog."
+        },
+        "certified_rule_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current count of certified rules. Should only grow or stay stable — decline indicates rule removal events requiring review."
+        },
+        "candidate_rule_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current count of candidate rules awaiting certification."
+        },
+        "drift_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Composite knowledge drift score 0.0–1.0. 0.0 = no drift. 1.0 = critical drift. Derived from stale_rules, conflict_count, and days_since_last_certification."
+        }
+      }
+    },
+
+    "last_actions": {
+      "type": "array",
+      "description": "Recent AI agent actions logged against this service. Most recent first. (FRJ-007)",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["action_id", "timestamp", "tier_used", "outcome"],
+        "additionalProperties": false,
+        "properties": {
+          "action_id": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "tier_used": { "type": "integer", "enum": [0, 1, 2, 3] },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "failure", "rolled_back", "blocked"]
+          },
+          "agent_id": { "type": "string" },
+          "rollback_descriptor_present": { "type": "boolean" },
+          "rules_applied": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Rule IDs that governed this action's domain logic."
+          }
+        }
+      }
+    },
+
+    "sense_meta": {
+      "type": "object",
+      "description": "Metadata about this SENSE emission.",
+      "additionalProperties": false,
+      "properties": {
+        "refresh_interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How frequently this endpoint refreshes its data.",
+          "example": 30
+        },
+        "instrumentation_version": {
+          "type": "string",
+          "description": "Version of the SENSE instrumentation library used.",
+          "example": "forja-sense-js/0.1"
+        },
+        "data_freshness_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum age of data in this snapshot (e.g. if some fields are cached)."
+        }
+      }
+    }
+
+  },
+
+  "examples": [
+    {
+      "forja_version": "0.1",
+      "service_id": "org.ankrlabs.mari8x",
+      "timestamp": "2026-03-14T08:30:00Z",
+      "health": {
+        "score": 0.97,
+        "status": "healthy",
+        "error_rate": 0.003,
+        "uptime_seconds": 864000,
+        "latency_p50_ms": 42,
+        "latency_p99_ms": 180,
+        "dependency_health": [
+          {
+            "dependency_id": "org.ankrlabs.superdomain",
+            "reachable": true,
+            "last_checked": "2026-03-14T08:29:55Z",
+            "health_impact": "critical"
+          }
+        ]
+      },
+      "velocity": {
+        "requests_per_minute": 47,
+        "requests_last_hour": 2820,
+        "requests_last_24h": 67680,
+        "ai_agent_requests_last_hour": 340,
+        "active_sessions": 12
+      },
+      "security": {
+        "current_trust_tier": 2,
+        "kill_switch_active": false,
+        "self_escalation_attempts": 0,
+        "failed_auth_attempts_last_hour": 0,
+        "last_security_scan": "2026-03-14T00:00:00Z",
+        "security_findings_open": 0
+      },
+      "knowledge_drift": {
+        "stale_rules": 2,
+        "last_rule_update": "2026-03-10T14:00:00Z",
+        "conflict_count": 0,
+        "days_since_last_certification": 4,
+        "certified_rule_count": 15,
+        "candidate_rule_count": 32,
+        "drift_score": 0.08
+      },
+      "last_actions": [
+        {
+          "action_id": "laytime-submit",
+          "timestamp": "2026-03-14T08:28:12Z",
+          "tier_used": 2,
+          "outcome": "success",
+          "agent_id": "ankr-claw-v2",
+          "rollback_descriptor_present": true,
+          "rules_applied": ["LAY-001", "LAY-007"]
+        }
+      ],
+      "sense_meta": {
+        "refresh_interval_seconds": 30,
+        "instrumentation_version": "forja-sense-js/0.1",
+        "data_freshness_seconds": 30
+      }
+    }
+  ]
+}
