@@ -195,7 +195,7 @@ This is FRJ-021 and FRJ-YK-008 in practice: knowledge breaks compute ties.
 
 ## Reference Implementation
 
-ANKR Labs runs AnkrForja in production across 151+ services. The reference implementation is the [AnkrCodex daemon](https://github.com/ankrlabs/ankr-codex) — it synthesizes STATE, TRUST, and SENSE for every service in the ANKR network from a single crawl.
+ANKR Labs runs AnkrForja in production across 151+ services. The reference implementation is the AnkrCodex daemon — it synthesizes STATE, TRUST, and SENSE for every service in the ANKR network from a single crawl.
 
 Endpoints:
 ```
