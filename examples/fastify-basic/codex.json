@@ -1,0 +1,29 @@
+{
+  "service": "example-booking-service",
+  "port": 4000,
+  "domain": "maritime",
+  "version": "1.0.0",
+  "can_answer": [
+    "booking.status",
+    "booking.list",
+    "vessel.schedule"
+  ],
+  "can_do": [
+    "BOOKING_CREATE",
+    "BOOKING_CANCEL",
+    "MANIFEST_CLOSE"
+  ],
+  "emits": [
+    "booking.created",
+    "booking.cancelled",
+    "manifest.closed"
+  ],
+  "depends_on": [
+    "mari8x-backend"
+  ],
+  "forja_state": "/api/v2/forja/state",
+  "forja_trust": "/api/v2/forja/trust",
+  "forja_sense": "/api/v2/forja/sense",
+  "forja_proof": "/api/v2/forja/proof",
+  "forja_version": "2.0"
+}
